@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor IVA Autónomos</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    .section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+    }
+    input, select, button {
+      font-size: 14px;
+      padding: 6px 8px;
+      margin-bottom: 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      text-align: right;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    .no-compute {
+      background-color: #ffecec;
+    }
+    .summary {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gestor de IVA para Autónomos</h1>
+  <p>Aplica el IVA de tus ingresos y gastos trimestrales como en el modelo 303. Los datos se guardan en tu navegador.</p>
+
+  <!-- Sección para gastos -->
+  <div class="section">
+    <h2>Registrar gasto</h2>
+    <form id="gastoForm">
+      <label>Trimestre:
+        <select id="gastoTrimestre" required>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <label>Fecha de factura:
+        <input type="date" id="gastoFecha" required />
+      </label>
+      <label>Nº de factura:
+        <input type="text" id="gastoNumero" required />
+      </label>
+      <label>Concepto:
+        <input type="text" id="gastoConcepto" />
+      </label>
+      <label>Proveedor:
+        <input type="text" id="gastoProveedor" />
+      </label>
+      <label>Base imponible (sin reducir):
+        <input type="number" step="0.01" id="gastoBase" required />
+      </label>
+      <label>Reducción (%) (porcentaje deducible):
+        <input type="number" step="0.1" min="0" max="100" id="gastoReduccion" value="100" />
+      </label>
+      <label>Tipo de IVA (%):
+        <select id="gastoTipoIVA">
+          <option value="4">4</option>
+          <option value="10">10</option>
+          <option value="21">21</option>
+        </select>
+      </label>
+      <button type="submit">Añadir gasto</button>
+    </form>
+  </div>
+
+  <!-- Sección para ingresos -->
+  <div class="section">
+    <h2>Registrar ingreso</h2>
+    <form id="ingresoForm">
+      <label>Trimestre:
+        <select id="ingresoTrimestre" required>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <label>Fecha de factura:
+        <input type="date" id="ingresoFecha" required />
+      </label>
+      <label>Nº de factura:
+        <input type="text" id="ingresoNumero" required />
+      </label>
+      <label>Concepto:
+        <input type="text" id="ingresoConcepto" />
+      </label>
+      <label>Cliente:
+        <input type="text" id="ingresoCliente" />
+      </label>
+      <label>Base imponible:
+        <input type="number" step="0.01" id="ingresoBase" required />
+      </label>
+      <label>Tipo de IVA (%):
+        <select id="ingresoTipoIVA">
+          <option value="4">4</option>
+          <option value="10">10</option>
+          <option value="21">21</option>
+        </select>
+      </label>
+      <label>Retención:
+        <input type="number" step="0.01" id="ingresoRetencion" value="0" />
+      </label>
+      <label>¿Computable en declaración?
+        <select id="ingresoComputable">
+          <option value="Y">Sí</option>
+          <option value="N">No</option>
+        </select>
+      </label>
+      <button type="submit">Añadir ingreso</button>
+    </form>
+  </div>
+
+  <!-- Sección de resumen -->
+  <div class="section">
+    <h2>Resumen por trimestre</h2>
+    <div id="resumenTables"></div>
+  </div>
+
+  <script>
+    // Almacenar datos en arrays y localStorage
+    let gastos = JSON.parse(localStorage.getItem('gastos') || '[]');
+    let ingresos = JSON.parse(localStorage.getItem('ingresos') || '[]');
+
+    function guardarDatos() {
+      localStorage.setItem('gastos', JSON.stringify(gastos));
+      localStorage.setItem('ingresos', JSON.stringify(ingresos));
+    }
+
+    // Añadir gasto
+    document.getElementById('gastoForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const trimestre = parseInt(document.getElementById('gastoTrimestre').value);
+      const fecha = document.getElementById('gastoFecha').value;
+      const numero = document.getElementById('gastoNumero').value;
+      const concepto = document.getElementById('gastoConcepto').value;
+      const proveedor = document.getElementById('gastoProveedor').value;
+      const base = parseFloat(document.getElementById('gastoBase').value);
+      const reduccion = parseFloat(document.getElementById('gastoReduccion').value) || 0;
+      const tipoIVA = parseFloat(document.getElementById('gastoTipoIVA').value);
+      const baseReducida = base * (reduccion / 100);
+      const ivaReducido = baseReducida * (tipoIVA / 100);
+      const totalReducido = baseReducida + ivaReducido;
+      gastos.push({ trimestre, fecha, numero, concepto, proveedor, base, reduccion, tipoIVA, baseReducida, ivaReducido, totalReducido });
+      guardarDatos();
+      actualizarResumen();
+      this.reset();
+      document.getElementById('gastoReduccion').value = 100; // default 100%
+    });
+
+    // Añadir ingreso
+    document.getElementById('ingresoForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const trimestre = parseInt(document.getElementById('ingresoTrimestre').value);
+      const fecha = document.getElementById('ingresoFecha').value;
+      const numero = document.getElementById('ingresoNumero').value;
+      const concepto = document.getElementById('ingresoConcepto').value;
+      const cliente = document.getElementById('ingresoCliente').value;
+      const base = parseFloat(document.getElementById('ingresoBase').value);
+      const tipoIVA = parseFloat(document.getElementById('ingresoTipoIVA').value);
+      const retencion = parseFloat(document.getElementById('ingresoRetencion').value) || 0;
+      const computable = document.getElementById('ingresoComputable').value === 'Y';
+      const ivaRepercutido = base * (tipoIVA / 100);
+      const total = base + ivaRepercutido - retencion;
+      ingresos.push({ trimestre, fecha, numero, concepto, cliente, base, tipoIVA, retencion, computable, ivaRepercutido, total });
+      guardarDatos();
+      actualizarResumen();
+      this.reset();
+      document.getElementById('ingresoRetencion').value = 0;
+    });
+
+    function sumar(arr, campo) {
+      return arr.reduce((sum, item) => sum + (item[campo] || 0), 0);
+    }
+
+    function actualizarResumen() {
+      const resumenDiv = document.getElementById('resumenTables');
+      resumenDiv.innerHTML = '';
+      for (let trimestre = 1; trimestre <= 4; trimestre++) {
+        const ing = ingresos.filter(i => i.trimestre === trimestre && i.computable);
+        const gas = gastos.filter(g => g.trimestre === trimestre);
+        // Sumas trimestrales
+        const baseIngresos = sumar(ing, 'base');
+        const ivaIngresos = sumar(ing, 'ivaRepercutido');
+        const baseGastos = sumar(gas, 'baseReducida');
+        const ivaGastos = sumar(gas, 'ivaReducido');
+        const resultado = (ivaIngresos - ivaGastos).toFixed(2);
+        // Crear tabla
+        let table = document.createElement('table');
+        let caption = document.createElement('caption');
+        caption.textContent = `Trimestre ${trimestre}`;
+        table.appendChild(caption);
+        table.innerHTML += `
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Base</th>
+              <th>IVA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Ingresos computables</td><td>${baseIngresos.toFixed(2)}</td><td>${ivaIngresos.toFixed(2)}</td></tr>
+            <tr><td>Gastos</td><td>${baseGastos.toFixed(2)}</td><td>${ivaGastos.toFixed(2)}</td></tr>
+            <tr><td><strong>Resultado IVA</strong></td><td colspan="2"><strong>${resultado}</strong></td></tr>
+          </tbody>
+        `;
+        resumenDiv.appendChild(table);
+      }
+    }
+
+    // Mostrar resumen inicial
+    actualizarResumen();
+  </script>
+</body>
+</html>
